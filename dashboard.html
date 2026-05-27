@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeleEmpuxo — Telemetria</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --red:    #e53935;
+  --red2:   #ff5252;
+  --amber:  #ffab00;
+  --cyan:   #00e5ff;
+  --green:  #00e676;
+  --blue:   #448aff;
+  --bg:     #06060a;
+  --bg2:    #0b0b10;
+  --panel:  #0e0e14;
+  --border: rgba(255,255,255,0.07);
+  --text:   #c8c8d0;
+  --dim:    rgba(255,255,255,0.25);
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+/* ════ LAYOUT ════ */
+.app {
+  display: grid;
+  grid-template-rows: 48px 1fr 64px 52px;
+  grid-template-columns: 1fr 240px;
+  height: 100vh;
+}
+
+/* ════ TOPBAR ════ */
+.topbar {
+  grid-column: 1 / -1;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  gap: 14px;
+}
+.topbar-logo {
+  font-family: 'Orbitron', monospace;
+  font-size: 12px; font-weight: 700;
+  color: #fff; letter-spacing: 4px; text-transform: uppercase;
+  white-space: nowrap;
+}
+.topbar-logo span { color: var(--red); }
+.topbar-sep { flex: 1; }
+.topbar-pill {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.3);
+}
+.dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #333; flex-shrink: 0;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.dot.ok   { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot.warn { background: var(--amber); box-shadow: 0 0 6px var(--amber); animation: blink 0.8s infinite; }
+.dot.err  { background: var(--red);   box-shadow: 0 0 6px var(--red);   animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: 0.15; } }
+.dot-lbl {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; letter-spacing: 1.5px;
+  color: var(--dim); text-transform: uppercase;
+  transition: color 0.3s;
+}
+.session-id {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px; color: var(--dim); letter-spacing: 2px;
+}
+
+/* ════ CHART AREA ════ */
+.chart-wrap {
+  grid-row: 2;
+  grid-column: 1;
+  padding: 14px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.chart-hdr {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-shrink: 0;
+}
+.chart-title {
+  font-family: 'Orbitron', monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 3px; color: rgba(255,255,255,0.35); text-transform: uppercase;
+}
+.hdr-line { flex:1; height:1px; background: var(--border); }
+.chart-hz {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; color: var(--dim); letter-spacing: 2px;
+}
+canvas#mainChart {
+  width: 100%; flex: 1; min-height: 0; display: block;
+}
+
+/* ════ METRICS BAR ════ */
+.metrics-bar {
+  grid-row: 3;
+  grid-column: 1;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+.metric-cell {
+  padding: 10px 12px;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; position: relative;
+}
+.metric-cell:last-child { border-right: none; }
+.metric-cell::after {
+  content:''; position:absolute; bottom:0; left:16px; right:16px;
+  height:2px; background: transparent;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.metric-cell.active::after { background: var(--red); box-shadow: 0 0 8px var(--red); }
+.metric-val {
+  font-family: 'Orbitron', monospace; font-size: 22px; font-weight: 900;
+  color: #fff; letter-spacing: -1px; transition: color 0.2s;
+  line-height: 1;
+}
+.metric-lbl  { font-size: 8px; letter-spacing: 2.5px; color: rgba(255,255,255,0.25); text-transform: uppercase; font-family: 'Share Tech Mono', monospace; text-align: center; }
+.metric-unit { font-family: 'Share Tech Mono', monospace; font-size: 8px; color: var(--dim); }
+
+/* State badge */
+.state-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: 'Orbitron', monospace;
+  font-size: 11px; letter-spacing: 2px;
+  color: #444; transition: color 0.3s;
+}
+.state-badge .sd {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #333; transition: background 0.3s, box-shadow 0.3s;
+}
+.state-badge.running  { color: var(--cyan); }
+.state-badge.running  .sd { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); animation: blink 1.2s infinite; }
+.state-badge.burning  { color: var(--red2); }
+.state-badge.burning  .sd { background: var(--red);  box-shadow: 0 0 12px var(--red); animation: blink 0.4s infinite; }
+.state-badge.complete { color: var(--green); }
+.state-badge.complete .sd { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.state-badge.idle     .sd { background: #333; }
+
+/* ════ ACTION BAR ════ */
+.action-bar {
+  grid-row: 4;
+  grid-column: 1 / -1;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 8px;
+}
+
+.abtn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+  position: relative; overflow: hidden;
+}
+.abtn::before {
+  content:''; position:absolute; left:0; top:0; bottom:0;
+  width:2px; background: transparent; transition: background 0.15s;
+}
+.abtn:hover:not(:disabled) { background: rgba(255,255,255,0.05); }
+.abtn:active:not(:disabled) { transform: scale(0.97); }
+.abtn:disabled { opacity: 0.28; cursor: not-allowed; }
+.abtn-icon { font-size: 13px; opacity: 0.8; }
+
+.abtn.start  { border-color: rgba(0,230,118,0.3); color: var(--green); }
+.abtn.start::before  { background: var(--green); }
+.abtn.start:hover:not(:disabled) { background: rgba(0,230,118,0.07); }
+
+.abtn.stop   { border-color: rgba(229,57,53,0.3); color: var(--red2); }
+.abtn.stop::before   { background: var(--red); }
+.abtn.stop:hover:not(:disabled)  { background: rgba(229,57,53,0.07); }
+
+.abtn.plot   { border-color: rgba(68,138,255,0.3); color: var(--blue); }
+.abtn.plot::before   { background: var(--blue); }
+.abtn.plot:hover:not(:disabled)  { background: rgba(68,138,255,0.07); }
+
+.abtn.tare   { border-color: rgba(255,171,0,0.3); color: var(--amber); }
+.abtn.tare::before   { background: var(--amber); }
+.abtn.tare:hover:not(:disabled)  { background: rgba(255,171,0,0.07); }
+
+.abtn.reset  { border-color: rgba(255,255,255,0.1); }
+.abtn.reset:hover:not(:disabled) { background: rgba(255,255,255,0.04); }
+
+.abar-sep { flex: 1; }
+.abar-divider { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; }
+
+/* Gear config panel */
+.cfg-trigger {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--dim);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px; cursor: pointer; transition: all 0.15s;
+}
+.cfg-trigger:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
+.cfg-trigger.open  { color: var(--cyan); border-color: rgba(0,229,255,0.3); }
+
+.cfg-panel {
+  position: fixed; bottom: 64px; right: 14px;
+  width: 320px;
+  background: #0e0e16;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.6);
+  z-index: 200;
+  display: none;
+  flex-direction: column;
+}
+.cfg-panel.open { display: flex; }
+.cfg-panel-hdr {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; letter-spacing: 3px; color: var(--dim);
+  text-transform: uppercase;
+}
+.cfg-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.cfg-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cfg-field { display: flex; flex-direction: column; gap: 4px; }
+.cfg-lbl {
+  font-size: 8px; letter-spacing: 2px; color: rgba(255,255,255,0.25);
+  text-transform: uppercase; font-family: 'Share Tech Mono', monospace;
+}
+.cfg-input {
+  background: rgba(0,0,0,0.5); border: 1px solid var(--border);
+  color: #fff; padding: 6px 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px; letter-spacing: 1px;
+  outline: none; transition: border-color 0.15s; width: 100%;
+}
+.cfg-input:focus { border-color: rgba(0,229,255,0.35); }
+.cfg-apply {
+  padding: 8px; border: 1px solid rgba(0,229,255,0.3); background: transparent;
+  color: var(--cyan); font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+  cursor: pointer; transition: background 0.15s;
+}
+.cfg-apply:hover { background: rgba(0,229,255,0.07); }
+
+/* ════ SIDEBAR (LOG + FILES) ════ */
+.sidebar {
+  grid-row: 2 / 4;
+  grid-column: 2;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.side-hdr {
+  padding: 10px 14px;
+  font-size: 8px; letter-spacing: 3px;
+  color: rgba(255,255,255,0.2); text-transform: uppercase;
+  font-family: 'Share Tech Mono', monospace;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.log-area {
+  flex: 1; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: #1e1e2e transparent;
+}
+.log-entry {
+  padding: 5px 12px; border-bottom: 1px solid rgba(255,255,255,0.03);
+  display: flex; gap: 8px; align-items: baseline;
+  font-family: 'Share Tech Mono', monospace; font-size: 9px;
+  animation: logFade 0.25s ease;
+}
+@keyframes logFade { from { opacity:0; background: rgba(229,57,53,0.04); } to { opacity:1; } }
+.log-ts  { color: rgba(255,255,255,0.18); flex-shrink:0; }
+.log-msg { color: var(--text); flex:1; word-break: break-word; line-height: 1.5; }
+.log-msg.ok   { color: var(--green); }
+.log-msg.warn { color: var(--amber); }
+.log-msg.err  { color: var(--red2); }
+.log-msg.info { color: var(--cyan); }
+
+.files-area {
+  border-top: 1px solid var(--border);
+  max-height: 180px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: #1e1e2e transparent;
+  flex-shrink: 0;
+}
+.file-item {
+  padding: 6px 12px;
+  font-family: 'Share Tech Mono', monospace; font-size: 9px;
+  color: var(--dim); cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+  border-bottom: 1px solid rgba(255,255,255,0.025);
+  transition: background 0.1s, color 0.1s;
+}
+.file-item:hover { background: rgba(255,255,255,0.04); color: #fff; }
+.file-icon { opacity: 0.45; font-size: 11px; }
+
+/* ════ OVERLAYS ════ */
+.burn-indicator {
+  position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
+  padding: 6px 24px;
+  background: rgba(229,57,53,0.1); border: 1px solid rgba(229,57,53,0.5);
+  color: var(--red2);
+  font-family: 'Orbitron', monospace; font-size: 10px; font-weight: 700;
+  letter-spacing: 5px; text-transform: uppercase;
+  pointer-events: none; opacity: 0; transition: opacity 0.2s;
+  z-index: 100;
+}
+.burn-indicator.show { opacity: 1; animation: burnPulse 0.5s ease infinite alternate; }
+@keyframes burnPulse {
+  from { box-shadow: 0 0 8px rgba(229,57,53,0.2); }
+  to   { box-shadow: 0 0 28px rgba(229,57,53,0.6); }
+}
+
+.complete-banner {
+  position: fixed; top: 56px; right: 260px;
+  padding: 10px 18px;
+  background: rgba(0,230,118,0.07); border: 1px solid rgba(0,230,118,0.3);
+  color: var(--green);
+  font-family: 'Share Tech Mono', monospace; font-size: 9px;
+  letter-spacing: 2px; text-transform: uppercase;
+  opacity: 0; transition: opacity 0.4s; pointer-events: none;
+  z-index: 100;
+}
+.complete-banner.show { opacity: 1; }
+
+/* ════ INIT SCREEN ════ */
+#initScreen {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(6,6,10,0.97);
+  backdrop-filter: blur(10px);
+  transition: opacity 0.6s ease;
+}
+.init-card {
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(14,14,20,0.97);
+  padding: 36px 52px; min-width: 340px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.init-title {
+  font-family: 'Orbitron', monospace; font-size: 9px;
+  letter-spacing: 4px; color: rgba(255,255,255,0.3);
+  text-transform: uppercase; text-align: center;
+}
+.init-row { display: flex; align-items: center; gap: 12px; }
+.init-lbl {
+  font-family: 'Share Tech Mono', monospace; font-size: 11px;
+  letter-spacing: 1px; color: rgba(255,255,255,0.4); flex: 1;
+  transition: color 0.3s;
+}
+.init-lbl.ok  { color: var(--green); }
+.init-lbl.err { color: var(--red2); }
+.init-error {
+  display: none; padding: 10px 14px;
+  border: 1px solid rgba(229,57,53,0.3);
+  background: rgba(229,57,53,0.05);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; color: #ff5252; letter-spacing: 0.5px; line-height: 1.6;
+}
+.init-retry {
+  display: none; padding: 9px 18px;
+  border: 1px solid rgba(229,57,53,0.4);
+  background: transparent; color: #ff5252; cursor: pointer;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+  transition: background 0.15s;
+}
+.init-retry:hover { background: rgba(229,57,53,0.12); }
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Init Screen -->
+<div id="initScreen">
+  <div class="init-card">
+    <div class="init-title">Inicializando Sistema</div>
+    <div class="init-row">
+      <div class="dot warn" id="init-dot-backend"></div>
+      <span class="init-lbl" id="init-lbl-backend">Conectando ao backend...</span>
+    </div>
+    <div class="init-row">
+      <div class="dot" id="init-dot-esp"></div>
+      <span class="init-lbl" id="init-lbl-esp">Aguardando ESP32...</span>
+    </div>
+    <div class="init-error" id="init-error"></div>
+    <button class="init-retry" id="init-retry" onclick="startInit()">↺ Tentar Novamente</button>
+  </div>
+</div>
+
+<div class="burn-indicator" id="burnInd">⬥ QUEIMA ATIVA ⬥</div>
+<div class="complete-banner" id="completeBanner">✓ TESTE CONCLUÍDO</div>
+
+<div class="app">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-logo">Tele<span>Empuxo</span></div>
+    <div class="topbar-pill" title="ESP32">
+      <div class="dot" id="dot-esp"></div>
+      <div class="dot-lbl" id="lbl-esp">ESP32</div>
+    </div>
+    <div class="topbar-pill" title="Servidor">
+      <div class="dot" id="dot-ws"></div>
+      <div class="dot-lbl" id="lbl-ws">Servidor</div>
+    </div>
+    <div class="topbar-sep"></div>
+    <div class="session-id" id="session-id">SEM SESSÃO</div>
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-wrap">
+    <div class="chart-hdr">
+      <div class="chart-title">Curva de Empuxo</div>
+      <div class="hdr-line"></div>
+      <div class="chart-hz" id="chart-hz">— Hz</div>
+    </div>
+    <canvas id="mainChart"></canvas>
+  </div>
+
+  <!-- Metrics -->
+  <div class="metrics-bar">
+    <div class="metric-cell" id="mc-force">
+      <div class="metric-val" id="m-force">0.0</div>
+      <div class="metric-lbl">Força</div>
+      <div class="metric-unit">N</div>
+    </div>
+    <div class="metric-cell">
+      <div class="metric-val" id="m-peak">0</div>
+      <div class="metric-lbl">Pico</div>
+      <div class="metric-unit">N</div>
+    </div>
+    <div class="metric-cell">
+      <div class="metric-val" id="m-imp">0.000</div>
+      <div class="metric-lbl">Impulso</div>
+      <div class="metric-unit">N·s</div>
+    </div>
+    <div class="metric-cell">
+      <div class="metric-val" id="m-dur">—</div>
+      <div class="metric-lbl">Queima</div>
+      <div class="metric-unit">s</div>
+    </div>
+    <div class="metric-cell">
+      <div class="state-badge idle" id="state-badge">
+        <div class="sd"></div>
+        <span id="state-label">IDLE</span>
+      </div>
+      <div class="metric-lbl" style="margin-top:4px">Estado</div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="side-hdr">Console</div>
+    <div class="log-area" id="logArea"></div>
+    <div class="side-hdr" style="border-top:1px solid var(--border)">Arquivos</div>
+    <div class="files-area" id="filesArea">
+      <div class="file-item" id="files-placeholder" style="color:rgba(255,255,255,0.12)">
+        <span class="file-icon">○</span> Nenhum arquivo
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Bar -->
+  <div class="action-bar">
+    <button class="abtn start" id="btn-start" onclick="sendCmd('start')">
+      <span class="abtn-icon">▶</span> Iniciar
+    </button>
+    <button class="abtn stop"  id="btn-stop"  onclick="sendCmd('stop')" disabled>
+      <span class="abtn-icon">■</span> Parar
+    </button>
+    <div class="abar-divider"></div>
+    <button class="abtn tare"  id="btn-tare"  onclick="sendCmd('tare')">
+      <span class="abtn-icon">⊙</span> Tara
+    </button>
+    <button class="abtn plot"  id="btn-plot"  onclick="sendCmd('plot')" disabled>
+      <span class="abtn-icon">📊</span> Gráfico
+    </button>
+    <button class="abtn reset" id="btn-reset" onclick="doReset()">
+      <span class="abtn-icon">↺</span> Reset
+    </button>
+    <div class="abar-sep"></div>
+    <button class="cfg-trigger" id="cfg-trigger" onclick="toggleCfg()">⚙ Config</button>
+  </div>
+
+</div>
+
+<!-- Config Panel (floating, above action bar) -->
+<div class="cfg-panel" id="cfgPanel">
+  <div class="cfg-panel-hdr">Configuração do Teste</div>
+  <div class="cfg-body">
+    <div class="cfg-row">
+      <div class="cfg-field">
+        <div class="cfg-lbl">Força Máx. Esperada (N)</div>
+        <input class="cfg-input" id="cfg-maxf" type="number" value="120" min="10" max="5000"/>
+      </div>
+      <div class="cfg-field">
+        <div class="cfg-lbl">Threshold Queima (N)</div>
+        <input class="cfg-input" id="cfg-thr"  type="number" value="2.0" min="0.1" step="0.1"/>
+      </div>
+    </div>
+    <button class="cfg-apply" onclick="applyConfig()">✓ Aplicar</button>
+  </div>
+</div>
+
+<script>
+// ════ CONFIG ════
+const params  = new URLSearchParams(location.search);
+const WS_IP   = params.get('ip')   || location.hostname || 'localhost';
+const WS_PORT = params.get('port') || '8766';
+const WS_URL  = `ws://${WS_IP}:${WS_PORT}`;
+
+// ════ STATE ════
+const STATE = { IDLE:'idle', RUNNING:'running', COMPLETE:'complete' };
+
+let systemState = STATE.IDLE;
+let burning     = false;
+let espOk       = false;
+let sessionName = '';
+let maxForce    = 120;
+let burnThr     = 2.0;
+let graphData   = [];
+let frozenTime  = null;
+let burnDur     = null;
+let hzCount     = 0, lastHzTs = Date.now();
+let animFrame   = null;
+let ws          = null;
+let wsReady     = false;
+
+// ════ CANVAS ════
+const canvas = document.getElementById('mainChart');
+const ctx    = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width  = Math.floor(rect.width  * devicePixelRatio);
+  canvas.height = Math.floor((rect.height - 34) * devicePixelRatio);
+  drawChart();
+}
+window.addEventListener('resize', resizeCanvas);
+setTimeout(resizeCanvas, 60);
+
+function drawChart() {
+  const dpr = devicePixelRatio;
+  const w   = canvas.width  / dpr;
+  const h   = canvas.height / dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (h <= 0) return;
+
+  const absMax = Math.max(...graphData.map(d => Math.abs(d.f)), maxForce * 0.1, 5);
+  const zero   = h * 0.85;
+  const pad    = { l: 48, r: 14 };
+  const plotW  = w - pad.l - pad.r;
+
+  // Grid
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+  ctx.lineWidth   = 0.5;
+  for (let i = 0; i <= 5; i++) {
+    const y   = (i / 5) * (zero - 8) + 4;
+    const val = ((5 - i) / 5 * absMax).toFixed(0);
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(w - pad.r, y);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.font      = `8px 'Share Tech Mono',monospace`;
+    ctx.textAlign = 'right';
+    ctx.fillText(val, pad.l - 4, y + 3);
+  }
+  ctx.stroke();
+
+  // Zero line
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth   = 0.5;
+  ctx.setLineDash([4, 4]);
+  ctx.moveTo(pad.l, zero); ctx.lineTo(w - pad.r, zero);
+  ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.font = '7px "Share Tech Mono",monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText('N', pad.l - 4, zero + 3);
+
+  if (graphData.length < 2) return;
+
+  // Threshold line
+  const thrY = zero - (burnThr / absMax) * (zero - 4);
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(255,171,0,0.2)'; ctx.lineWidth = 0.8;
+  ctx.setLineDash([3, 7]);
+  ctx.moveTo(pad.l, thrY); ctx.lineTo(w - pad.r, thrY);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  const pts = graphData.map((d, i) => ({
+    x: pad.l + (i / (graphData.length - 1)) * plotW,
+    y: zero - (d.f / absMax) * (zero - 4),
+  }));
+
+  // Fill
+  ctx.beginPath();
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length-1].x, zero);
+  ctx.lineTo(pad.l, zero);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, burning ? 'rgba(229,57,53,0.35)' : 'rgba(229,57,53,0.12)');
+  grad.addColorStop(1, 'rgba(229,57,53,0)');
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) {
+    const cpx = (pts[i-1].x + pts[i].x) / 2;
+    ctx.bezierCurveTo(cpx, pts[i-1].y, cpx, pts[i].y, pts[i].x, pts[i].y);
+  }
+  ctx.strokeStyle = burning ? '#ff5252' : '#e53935';
+  ctx.lineWidth   = burning ? 2.2 : 1.6;
+  ctx.shadowColor = '#e53935';
+  ctx.shadowBlur  = burning ? 8 : 2;
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  // Tip dot
+  const last = pts[pts.length - 1];
+  ctx.beginPath(); ctx.arc(last.x, last.y, 3.5, 0, Math.PI * 2);
+  ctx.fillStyle   = burning ? '#ff5252' : '#e53935';
+  ctx.shadowColor = '#e53935'; ctx.shadowBlur = 10;
+  ctx.fill(); ctx.shadowBlur = 0;
+}
+
+// ════ WEBSOCKET ════
+function connect() {
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => {
+    wsReady = true;
+    setDot('ws', 'ok', 'Conectado');
+    addLog('Conectado ao servidor.', 'ok');
+    sendCmd('get_logs');
+    sendCmd('get_plots');
+    syncButtons();
+  };
+  ws.onmessage = e => { try { handleMsg(JSON.parse(e.data)); } catch {} };
+  ws.onclose = () => {
+    wsReady = false; espOk = false;
+    setDot('ws',  'err', 'Desconectado');
+    setDot('esp', '', 'ESP32');
+    addLog('Conexão perdida. Reconectando...', 'err');
+    syncButtons();
+    setTimeout(connect, 2500);
+  };
+  ws.onerror = () => setDot('ws', 'err', 'Erro WS');
+}
+
+function sendCmd(action, extra) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    addLog('Sem conexão com o servidor.', 'err');
+    return;
+  }
+  ws.send(JSON.stringify({ action, ...extra }));
+}
+
+// ════ MESSAGE HANDLER ════
+function handleMsg(msg) {
+  const t = msg.type;
+
+  if (t === 'state_update') {
+    applyServerState(msg);
+    if (msg.event === 'session_start') {
+      addLog(`Sessão iniciada: ${msg.session || '—'}`, 'ok');
+      frozenTime = null; burnDur = null; graphData = [];
+      document.getElementById('m-dur').textContent = '—';
+    } else if (msg.event === 'session_end') {
+      addLog(`✓ Concluído — Pico: ${msg.peak}N · Impulso: ${msg.impulse}N·s · Duração: ${msg.duration}s`, 'ok');
+      if (msg.plot) addLog(`Gráfico: ${msg.plot}`, 'info');
+      sendCmd('get_logs'); sendCmd('get_plots');
+      showCompleteBanner();
+    } else if (msg.event === 'reset') {
+      graphData = []; frozenTime = null; burnDur = null;
+      clearMetrics();
+      addLog('Sistema resetado.', 'info');
+      drawChart();
+    }
+    return;
+  }
+
+  if (t === 'data') {
+    const force   = parseFloat(msg.f       ?? 0);
+    const elapsed = parseFloat(msg.elapsed ?? 0);
+    const peak    = parseFloat(msg.peak    ?? 0);
+    const impulse = parseFloat(msg.impulse ?? 0);
+
+    graphData.push({ f: force });
+    if (graphData.length > 600) graphData.shift();
+
+    document.getElementById('m-force').textContent = force.toFixed(2);
+    document.getElementById('m-peak').textContent  = peak.toFixed(1);
+    document.getElementById('m-imp').textContent   = impulse.toFixed(3);
+
+    if (msg.burning) {
+      burnDur = elapsed;
+      document.getElementById('m-dur').textContent = elapsed.toFixed(2);
+    } else if (burnDur !== null && systemState !== STATE.COMPLETE) {
+      document.getElementById('m-dur').textContent = burnDur.toFixed(2);
+    }
+
+    const wasBurning = burning;
+    burning = !!msg.burning;
+    if (burning !== wasBurning) {
+      document.getElementById('burnInd').classList.toggle('show', burning);
+      document.getElementById('mc-force').classList.toggle('active', burning);
+      updateStateBadge();
+    }
+
+    hzCount++;
+    const now = Date.now();
+    if (now - lastHzTs >= 1000) {
+      document.getElementById('chart-hz').textContent = `${hzCount} Hz`;
+      hzCount = 0; lastHzTs = now;
+    }
+
+    if (animFrame) cancelAnimationFrame(animFrame);
+    animFrame = requestAnimationFrame(drawChart);
+    return;
+  }
+
+  if (t === 'burn_start') {
+    burning = true; updateStateBadge();
+    addLog('⚡ Queima detectada!', 'warn');
+    return;
+  }
+
+  if (t === 'burn_end') {
+    burning = false; updateStateBadge();
+    addLog(`Queima finalizada — ${parseFloat(msg.duration ?? 0).toFixed(3)}s · Pico: ${msg.peak}N`, 'info');
+    return;
+  }
+
+  if (t === 'plot_ready') {
+    addLog(`Gráfico salvo: ${msg.name || msg.path}`, 'ok');
+    sendCmd('get_plots'); return;
+  }
+
+  if (t === 'log_list')  { updateFiles(msg.logs  || [], 'csv'); return; }
+  if (t === 'plot_list') { updateFiles(msg.plots || [], 'png'); return; }
+
+  if (t === 'tare_ack') {
+    const reached = msg.esp_reached !== false;
+    addLog(reached ? 'Tara enviada ao ESP32.' : 'Tara: ESP32 não conectado.', reached ? 'info' : 'warn');
+    return;
+  }
+
+  if (t === 'mission_blocked') {
+    addLog(`⛔ Início bloqueado — ${msg.reason || 'NO-GO'}`, 'err');
+    return;
+  }
+}
+
+// ════ SERVER STATE ════
+function applyServerState(msg) {
+  if (msg.esp !== undefined) {
+    espOk = !!msg.esp;
+    setDot('esp', espOk ? 'ok' : '', espOk ? 'ESP32 OK' : 'ESP32');
+  }
+  if (msg.state) systemState = msg.state;
+  if (msg.session !== undefined) {
+    sessionName = msg.session || '';
+    document.getElementById('session-id').textContent = sessionName || 'SEM SESSÃO';
+  }
+  if (msg.peak    !== undefined) document.getElementById('m-peak').textContent = parseFloat(msg.peak).toFixed(1);
+  if (msg.impulse !== undefined) document.getElementById('m-imp').textContent  = parseFloat(msg.impulse).toFixed(3);
+  updateStateBadge();
+  syncButtons();
+}
+
+// ════ STATE BADGE ════
+function updateStateBadge() {
+  const badge = document.getElementById('state-badge');
+  const label = document.getElementById('state-label');
+  badge.className = 'state-badge';
+  if (burning && systemState === STATE.RUNNING) {
+    badge.classList.add('burning'); label.textContent = 'QUEIMA';
+  } else if (systemState === STATE.RUNNING) {
+    badge.classList.add('running'); label.textContent = 'RUNNING';
+  } else if (systemState === STATE.COMPLETE) {
+    badge.classList.add('complete'); label.textContent = 'COMPLETO';
+  } else {
+    badge.classList.add('idle'); label.textContent = 'IDLE';
+  }
+}
+
+// ════ BUTTON SYNC ════
+function syncButtons() {
+  const isRunning  = systemState === STATE.RUNNING;
+  const isComplete = systemState === STATE.COMPLETE;
+  const isIdle     = systemState === STATE.IDLE;
+  document.getElementById('btn-start').disabled = !isIdle  || !wsReady;
+  document.getElementById('btn-stop').disabled  = !isRunning || !wsReady;
+  document.getElementById('btn-plot').disabled  = isRunning || graphData.length === 0 || !wsReady;
+  document.getElementById('btn-reset').disabled = isRunning || !wsReady;
+  document.getElementById('btn-tare').disabled  = !wsReady;
+}
+
+// ════ CONFIG PANEL ════
+let cfgOpen = false;
+function toggleCfg() {
+  cfgOpen = !cfgOpen;
+  document.getElementById('cfgPanel').classList.toggle('open', cfgOpen);
+  document.getElementById('cfg-trigger').classList.toggle('open', cfgOpen);
+}
+// Close on outside click
+document.addEventListener('click', e => {
+  if (cfgOpen && !e.target.closest('#cfgPanel') && !e.target.closest('#cfg-trigger')) {
+    cfgOpen = false;
+    document.getElementById('cfgPanel').classList.remove('open');
+    document.getElementById('cfg-trigger').classList.remove('open');
+  }
+});
+
+function applyConfig() {
+  maxForce = parseFloat(document.getElementById('cfg-maxf').value) || 120;
+  burnThr  = parseFloat(document.getElementById('cfg-thr').value)  || 2.0;
+  addLog(`Config: maxF=${maxForce}N  threshold=${burnThr}N`, 'info');
+  drawChart();
+  toggleCfg();
+}
+
+// ════ HELPERS ════
+function doReset() {
+  if (systemState === STATE.RUNNING) { addLog('Pare o teste antes de resetar.', 'warn'); return; }
+  sendCmd('reset');
+}
+
+function showCompleteBanner() {
+  const b = document.getElementById('completeBanner');
+  b.classList.add('show');
+}
+
+function clearMetrics() {
+  document.getElementById('m-force').textContent = '0.0';
+  document.getElementById('m-peak').textContent  = '0';
+  document.getElementById('m-imp').textContent   = '0.000';
+  document.getElementById('m-dur').textContent   = '—';
+  document.getElementById('burnInd').classList.remove('show');
+  document.getElementById('mc-force').classList.remove('active');
+  document.getElementById('completeBanner').classList.remove('show');
+  burning = false;
+}
+
+function setDot(which, cls, label) {
+  const dot = document.getElementById(`dot-${which}`);
+  const lbl = document.getElementById(`lbl-${which}`);
+  if (dot) dot.className = `dot ${cls}`;
+  if (lbl && label) lbl.textContent = label;
+}
+
+function addLog(text, cls = '') {
+  const area = document.getElementById('logArea');
+  const now  = new Date().toTimeString().slice(0, 8);
+  const el   = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `<span class="log-ts">${now}</span><span class="log-msg ${cls}">${text}</span>`;
+  area.appendChild(el);
+  area.scrollTop = area.scrollHeight;
+  while (area.children.length > 300) area.removeChild(area.firstChild);
+}
+
+function updateFiles(files, ext) {
+  const area = document.getElementById('filesArea');
+  const ph   = document.getElementById('files-placeholder');
+  files.forEach(fname => {
+    if (area.querySelector(`[data-name="${CSS.escape(fname)}"]`)) return;
+    if (ph) ph.remove();
+    const icon = ext === 'csv' ? '📄' : '📊';
+    const url  = ext === 'csv' ? `/logs/${fname}` : `/plots/${fname}`;
+    const el   = document.createElement('div');
+    el.className    = 'file-item';
+    el.dataset.name = fname;
+    el.innerHTML    = `<span class="file-icon">${icon}</span>${fname}`;
+    el.onclick      = () => window.open(`http://${WS_IP}:8080${url}`, '_blank');
+    area.insertBefore(el, area.firstChild);
+  });
+}
+
+// ════ INIT SCREEN ════
+const INIT_TIMEOUT_MS  = 8000;
+const INIT_ESP_WAIT_MS = 12000;
+
+function setInitDot(id, cls, label) {
+  const dot = document.getElementById(`init-dot-${id}`);
+  const lbl = document.getElementById(`init-lbl-${id}`);
+  if (dot) dot.className = `dot ${cls}`;
+  if (lbl && label) {
+    lbl.textContent = label;
+    lbl.className   = `init-lbl${cls === 'ok' ? ' ok' : cls === 'err' ? ' err' : ''}`;
+  }
+}
+
+function showInitError(msg) {
+  const el  = document.getElementById('init-error');
+  const btn = document.getElementById('init-retry');
+  if (el)  { el.style.display = 'block'; el.textContent = `⚠ ${msg}`; }
+  if (btn) { btn.style.display = 'block'; }
+}
+
+function hideInitScreen() {
+  const screen = document.getElementById('initScreen');
+  if (!screen) return;
+  screen.style.opacity = '0';
+  setTimeout(() => screen?.parentNode?.removeChild(screen), 700);
+}
+
+async function waitForEsp(timeoutMs) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res  = await fetch(`http://${WS_IP}:8080/api/health`);
+      const data = await res.json();
+      if (data.esp) return true;
+    } catch {}
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  return false;
+}
+
+async function startInit() {
+  document.getElementById('init-error').style.display  = 'none';
+  document.getElementById('init-retry').style.display  = 'none';
+  setInitDot('backend', 'warn', 'Conectando ao backend...');
+  setInitDot('esp', '', 'Aguardando ESP32...');
+
+  let health;
+  try {
+    const ctrl  = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), INIT_TIMEOUT_MS);
+    const res   = await fetch(`http://${WS_IP}:8080/api/health`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    health = await res.json();
+  } catch (e) {
+    setInitDot('backend', 'err', 'Backend inacessível');
+    showInitError(`Não foi possível conectar ao backend em ${WS_IP}:8080.\nVerifique se o servidor Python está rodando.`);
+    return;
+  }
+
+  setInitDot('backend', 'ok', 'Backend OK');
+
+  if (!health.esp) {
+    setInitDot('esp', 'warn', 'Aguardando ESP32...');
+    const espOk = await waitForEsp(INIT_ESP_WAIT_MS);
+    if (!espOk) {
+      setInitDot('esp', 'err', 'ESP32 não encontrado');
+      showInitError(`ESP32 não está conectado.\nVerifique a conexão WiFi e tente novamente.`);
+      return;
+    }
+  }
+
+  setInitDot('esp', 'ok', 'ESP32 OK');
+  await new Promise(r => setTimeout(r, 500));
+  connect();
+  hideInitScreen();
+}
+
+// ════ BOOT ════
+addLog('Dashboard v4 iniciado.', 'info');
+addLog(`Servidor: ${WS_URL}`, 'info');
+window.addEventListener('DOMContentLoaded', startInit);
+</script>
+</body>
+</html>

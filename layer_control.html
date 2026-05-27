@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mission Control</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap');
+
+:root {
+  --red:    #e53935;
+  --red2:   #ff5252;
+  --amber:  #ffab00;
+  --cyan:   #00e5ff;
+  --green:  #00e676;
+  --dark:   #06060a;
+  --panel:  rgba(10,10,18,0.95);
+  --border: rgba(255,255,255,0.07);
+  --text:   rgba(255,255,255,0.85);
+  --dim:    rgba(255,255,255,0.3);
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--dark);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content:''; position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events:none; z-index:0;
+}
+body::after {
+  content:''; position:fixed; inset:0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.02) 2px, rgba(0,0,0,0.02) 4px
+  );
+  pointer-events:none; z-index:0;
+}
+
+/* ── Layout ── */
+.page {
+  position:relative; z-index:1;
+  max-width: 1200px; margin: 0 auto;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  grid-template-rows: auto auto 1fr;
+  gap: 16px;
+}
+
+/* ── Header ── */
+.header {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.header-left { display:flex; align-items:center; gap:14px; }
+.header-logo {
+  font-family:'Orbitron',monospace;
+  font-size:10px; letter-spacing:5px; text-transform:uppercase;
+  color: var(--red); opacity:0.9;
+}
+.header-title {
+  font-family:'Orbitron',monospace;
+  font-size:16px; font-weight:900; letter-spacing:2px; color:#fff;
+}
+.header-sub {
+  font-family:'Share Tech Mono',monospace;
+  font-size:9px; letter-spacing:3px; color:var(--dim); text-transform:uppercase;
+}
+.ws-pill {
+  display:flex; align-items:center; gap:7px;
+  padding:5px 12px; border:1px solid var(--border);
+  background: rgba(0,0,0,0.4);
+  font-family:'Share Tech Mono',monospace;
+  font-size:9px; letter-spacing:2px; color:var(--dim); text-transform:uppercase;
+}
+.ws-dot { width:6px; height:6px; border-radius:50%; background:#444; transition:all 0.3s; }
+.ws-dot.ok   { background:var(--green); box-shadow:0 0 8px var(--green); }
+.ws-dot.err  { background:var(--red2);  box-shadow:0 0 8px var(--red2); animation:blink 0.5s infinite; }
+.ws-dot.warn { background:var(--amber); box-shadow:0 0 8px var(--amber); animation:blink 1s infinite; }
+@keyframes blink { 50%{opacity:0.2} }
+
+/* ── Status Bar ── */
+.status-bar {
+  grid-column: 1 / -1;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border); overflow: hidden;
+}
+.status-cell {
+  background: rgba(6,6,10,0.97);
+  padding: 10px 14px; display:flex; flex-direction:column; gap:3px;
+}
+.status-lbl {
+  font-family:'Share Tech Mono',monospace;
+  font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--dim);
+}
+.status-val {
+  font-family:'Orbitron',monospace;
+  font-size:16px; font-weight:700; color:#fff; transition:color 0.2s;
+}
+.status-val.green { color:var(--green); }
+.status-val.amber { color:var(--amber); }
+.status-val.red   { color:var(--red2); }
+.status-val.cyan  { color:var(--cyan); }
+.status-val.dim   { color:#444; }
+
+/* ── Columns ── */
+.main-col { display:flex; flex-direction:column; gap:16px; }
+.side-col  { display:flex; flex-direction:column; gap:16px; }
+
+/* ── Card ── */
+.card {
+  background: var(--panel); border:1px solid var(--border); overflow:hidden;
+}
+.card-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 16px; border-bottom:1px solid var(--border);
+  background:rgba(0,0,0,0.3);
+}
+.card-title {
+  font-family:'Share Tech Mono',monospace;
+  font-size:8px; letter-spacing:4px; text-transform:uppercase; color:var(--dim);
+}
+.card-badge {
+  font-family:'Share Tech Mono',monospace;
+  font-size:8px; letter-spacing:2px; text-transform:uppercase;
+  padding:3px 8px; border:1px solid;
+}
+.card-badge.red   { color:var(--red2);  border-color:rgba(255,82,82,0.3); }
+.card-badge.green { color:var(--green); border-color:rgba(0,230,118,0.3); }
+.card-badge.amber { color:var(--amber); border-color:rgba(255,171,0,0.3); }
+.card-badge.dim   { color:var(--dim);   border-color:var(--border); }
+.card-body { padding:18px 16px; }
+
+/* ── T-Minus ── */
+.tminus-wrap {
+  display:flex; flex-direction:column; align-items:center; padding:6px 0 16px;
+}
+.tminus-label {
+  font-family:'Share Tech Mono',monospace;
+  font-size:8px; letter-spacing:4px; text-transform:uppercase;
+  color:var(--dim); margin-bottom:10px;
+}
+.tminus-display {
+  font-family:'Orbitron',monospace;
+  font-size:72px; font-weight:900; letter-spacing:-2px;
+  color:#fff; line-height:1;
+  text-shadow:0 0 40px rgba(255,255,255,0.06);
+  transition:color 0.3s, text-shadow 0.4s;
+}
+.tminus-display .t-prefix { font-size:28px; color:var(--dim); vertical-align:super; margin-right:3px; }
+.tminus-display.counting  { color:#fff; text-shadow:0 0 28px rgba(0,229,255,0.12); }
+.tminus-display.hold      { color:var(--amber); text-shadow:0 0 36px rgba(255,171,0,0.35); animation:holdPulse 1.2s ease-in-out infinite; }
+.tminus-display.urgent    { color:var(--red2);  text-shadow:0 0 36px rgba(255,82,82,0.45); }
+.tminus-display.scrubbed  { color:#2a2a2a; text-shadow:none; }
+@keyframes holdPulse { 0%,100%{opacity:0.8} 50%{opacity:1} }
+
+.hold-reason {
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:2px; text-transform:uppercase;
+  color:var(--amber); margin-top:8px; text-align:center;
+  animation:holdPulse 1.2s ease-in-out infinite; display:none;
+}
+.hold-reason.show { display:block; }
+.tminus-status {
+  font-family:'Share Tech Mono',monospace;
+  font-size:9px; letter-spacing:3px; text-transform:uppercase;
+  color:var(--dim); margin-top:8px;
+}
+
+/* T configurador */
+.t-config {
+  display:flex; align-items:center; gap:8px; margin-top:14px;
+  padding-top:14px; border-top:1px solid var(--border);
+}
+.t-config label {
+  font-family:'Share Tech Mono',monospace;
+  font-size:8px; letter-spacing:2px; text-transform:uppercase;
+  color:var(--dim); white-space:nowrap;
+}
+.t-input {
+  background:rgba(0,0,0,0.5); border:1px solid var(--border);
+  color:#fff; font-family:'Orbitron',monospace; font-size:15px;
+  padding:7px 10px; width:80px; text-align:center;
+  outline:none; transition:border-color 0.2s;
+}
+.t-input:focus { border-color:rgba(0,229,255,0.35); }
+.t-unit { font-family:'Share Tech Mono',monospace; font-size:8px; letter-spacing:2px; color:var(--dim); }
+.btn-set-t {
+  flex:1; background:transparent; border:1px solid var(--border);
+  color:var(--dim); font-family:'Share Tech Mono',monospace;
+  font-size:8px; letter-spacing:2px; text-transform:uppercase;
+  padding:8px 10px; cursor:pointer; transition:all 0.2s;
+}
+.btn-set-t:hover { border-color:rgba(255,255,255,0.2); color:#fff; }
+
+/* ── Mission Buttons ── */
+.mission-btns { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.mission-btns.three { grid-template-columns:1fr 1fr 1fr; }
+
+.mbtn {
+  position:relative; overflow:hidden; background:transparent;
+  border:1px solid; font-family:'Orbitron',monospace;
+  font-size:10px; font-weight:700; letter-spacing:3px; text-transform:uppercase;
+  padding:14px 8px; cursor:pointer; transition:all 0.2s;
+  display:flex; flex-direction:column; align-items:center; gap:5px;
+}
+.mbtn::before { content:''; position:absolute; inset:0; opacity:0; transition:opacity 0.15s; }
+.mbtn:hover::before { opacity:0.06; }
+.mbtn:active::before { opacity:0.12; }
+.mbtn:disabled { opacity:0.2; cursor:not-allowed; }
+.mbtn:disabled::before { display:none; }
+.mbtn-icon  { font-size:18px; }
+.mbtn-label { font-size:8px; letter-spacing:2px; color:var(--dim); }
+
+.mbtn.start  { border-color:rgba(0,229,255,0.4); color:var(--cyan); }
+.mbtn.start::before  { background:var(--cyan); }
+.mbtn.hold   { border-color:rgba(255,171,0,0.4); color:var(--amber); }
+.mbtn.hold::before   { background:var(--amber); }
+.mbtn.hold.pulsing   { animation:holdBtnPulse 1s ease-in-out infinite; }
+@keyframes holdBtnPulse { 0%,100%{border-color:rgba(255,171,0,0.4)} 50%{border-color:rgba(255,171,0,0.9);box-shadow:0 0 10px rgba(255,171,0,0.15)} }
+.mbtn.resume { border-color:rgba(0,230,118,0.4); color:var(--green); }
+.mbtn.resume::before { background:var(--green); }
+.mbtn.scrub  { border-color:rgba(229,57,53,0.4); color:var(--red2); }
+.mbtn.scrub::before  { background:var(--red); }
+.mbtn.scrub.confirm-mode { border-color:var(--red2); box-shadow:0 0 18px rgba(229,57,53,0.2); animation:scrubWarn 0.5s ease-in-out infinite alternate; }
+@keyframes scrubWarn { from{box-shadow:0 0 8px rgba(229,57,53,0.08)} to{box-shadow:0 0 20px rgba(229,57,53,0.3)} }
+.mbtn.reset-m { border-color:var(--border); color:var(--dim); }
+.mbtn.reset-m::before { background:#fff; }
+
+/* Scrub confirm */
+.scrub-confirm {
+  display:none; flex-direction:column; gap:8px;
+  padding:14px; background:rgba(229,57,53,0.06);
+  border:1px solid rgba(229,57,53,0.2); margin-top:8px;
+}
+.scrub-confirm.show { display:flex; }
+.scrub-confirm input {
+  background:rgba(0,0,0,0.5); border:1px solid rgba(229,57,53,0.25);
+  color:#fff; font-family:'Share Tech Mono',monospace; font-size:10px;
+  padding:7px 10px; outline:none; width:100%;
+}
+.scrub-confirm input::placeholder { color:rgba(255,255,255,0.18); }
+.scrub-confirm-btns { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.scrub-yes {
+  background:var(--red); border:none; color:#fff;
+  font-family:'Orbitron',monospace; font-size:9px; letter-spacing:3px;
+  padding:9px; cursor:pointer; font-weight:700; text-transform:uppercase;
+  transition:opacity 0.2s;
+}
+.scrub-yes:hover { opacity:0.85; }
+.scrub-no {
+  background:transparent; border:1px solid var(--border); color:var(--dim);
+  font-family:'Orbitron',monospace; font-size:9px; letter-spacing:3px;
+  padding:9px; cursor:pointer; text-transform:uppercase; transition:all 0.2s;
+}
+.scrub-no:hover { color:#fff; border-color:rgba(255,255,255,0.2); }
+
+/* ── Mission blocked banner ── */
+.mission-blocked-banner {
+  display:none;
+  padding:10px 14px;
+  background:rgba(229,57,53,0.08);
+  border:1px solid rgba(229,57,53,0.3);
+  margin-top:10px;
+}
+.mission-blocked-banner.show { display:flex; align-items:center; gap:10px; }
+.mbb-icon { color:var(--red2); font-size:14px; flex-shrink:0; }
+.mbb-text { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; color:var(--red2); flex:1; }
+.mbb-close {
+  background:transparent; border:none; color:var(--dim);
+  font-size:12px; cursor:pointer; padding:2px 4px;
+  transition:color 0.15s;
+}
+.mbb-close:hover { color:#fff; }
+
+/* ── GO/NO-GO ── */
+.gonogo-grid  { display:flex; flex-direction:column; gap:6px; }
+.gonogo-item {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 12px; border:1px solid var(--border); background:rgba(0,0,0,0.2);
+  transition:border-color 0.2s, background 0.2s;
+}
+.gonogo-item.go   { border-color:rgba(0,230,118,0.22); background:rgba(0,230,118,0.03); }
+.gonogo-item.nogo { border-color:rgba(229,57,53,0.18); }
+.gonogo-label {
+  font-family:'Rajdhani',sans-serif; font-size:13px; font-weight:600;
+  letter-spacing:1px; color:var(--text);
+}
+.gonogo-label .auto-tag {
+  font-family:'Share Tech Mono',monospace; font-size:7px; letter-spacing:2px;
+  color:var(--dim); margin-left:6px; text-transform:uppercase;
+}
+.gonogo-toggle { display:flex; align-items:center; gap:5px; }
+.gonogo-btn {
+  background:transparent; border:1px solid var(--border);
+  font-family:'Share Tech Mono',monospace; font-size:8px; letter-spacing:2px;
+  padding:4px 9px; cursor:pointer; text-transform:uppercase; transition:all 0.15s;
+}
+.gonogo-btn.go-btn   { color:var(--green); border-color:rgba(0,230,118,0.25); }
+.gonogo-btn.go-btn:hover:not(:disabled)   { background:rgba(0,230,118,0.1); }
+.gonogo-btn.go-btn.active   { background:rgba(0,230,118,0.13); border-color:var(--green); }
+.gonogo-btn.nogo-btn { color:var(--red2);  border-color:rgba(255,82,82,0.25); }
+.gonogo-btn.nogo-btn:hover:not(:disabled) { background:rgba(255,82,82,0.08); }
+.gonogo-btn.nogo-btn.active { background:rgba(255,82,82,0.1); border-color:var(--red2); }
+.gonogo-btn:disabled { opacity:0.28; cursor:not-allowed; }
+
+.gonogo-summary {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 12px; margin-top:6px;
+  border:1px solid var(--border); background:rgba(0,0,0,0.3);
+}
+.gonogo-summary-lbl { font-family:'Share Tech Mono',monospace; font-size:8px; letter-spacing:3px; text-transform:uppercase; color:var(--dim); }
+.gonogo-summary-val { font-family:'Orbitron',monospace; font-size:12px; font-weight:700; letter-spacing:2px; transition:color 0.3s; }
+.gonogo-summary-val.all-go { color:var(--green); }
+.gonogo-summary-val.not-go { color:var(--red2); }
+
+/* ── Quick Session Controls ── */
+.session-lock {
+  display:none;
+  align-items:center; gap:8px; padding:8px 12px; margin-bottom:10px;
+  background:rgba(229,57,53,0.06); border:1px solid rgba(229,57,53,0.2);
+}
+.session-lock.show { display:flex; }
+.session-lock-txt {
+  font-family:'Share Tech Mono',monospace;
+  font-size:8px; letter-spacing:1.5px; color:rgba(255,82,82,0.7);
+  text-transform:uppercase;
+}
+
+/* ── Overlay Controls ── */
+.ovl-global-btns { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.ovl-global-btn {
+  background:transparent; border:1px solid var(--border);
+  font-family:'Share Tech Mono',monospace; font-size:8px; letter-spacing:2px;
+  padding:9px; cursor:pointer; text-transform:uppercase; color:var(--dim);
+  transition:all 0.2s;
+}
+.ovl-global-btn:hover { background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.15); color:#fff; }
+.ovl-global-btn.show  { color:var(--cyan); border-color:rgba(0,229,255,0.3); }
+.ovl-global-btn.show:hover { background:rgba(0,229,255,0.05); }
+.ovl-global-btn.hide  { color:var(--red2); border-color:rgba(229,57,53,0.3); }
+.ovl-global-btn.hide:hover { background:rgba(229,57,53,0.05); }
+
+.ovl-grid { display:flex; flex-direction:column; gap:6px; }
+.ovl-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 12px; border:1px solid var(--border); background:rgba(0,0,0,0.2);
+}
+.ovl-name { font-family:'Rajdhani',sans-serif; font-size:13px; font-weight:600; letter-spacing:1px; }
+.ovl-btns { display:flex; gap:5px; }
+.ovl-btn {
+  background:transparent; border:1px solid var(--border);
+  font-family:'Share Tech Mono',monospace; font-size:8px; letter-spacing:2px;
+  padding:4px 9px; cursor:pointer; text-transform:uppercase;
+  transition:all 0.15s; color:var(--dim);
+}
+.ovl-btn.show-btn:hover { background:rgba(0,229,255,0.07); border-color:rgba(0,229,255,0.3); color:var(--cyan); }
+.ovl-btn.hide-btn:hover { background:rgba(229,57,53,0.07); border-color:rgba(229,57,53,0.3); color:var(--red2); }
+.ovl-btn.show-btn.active { background:rgba(0,229,255,0.09); border-color:var(--cyan); color:var(--cyan); }
+.ovl-btn.hide-btn.active { background:rgba(229,57,53,0.09); border-color:var(--red2); color:var(--red2); }
+
+/* ── Files ── */
+.files-list { display:flex; flex-direction:column; max-height:180px; overflow-y:auto; }
+.file-item {
+  display:flex; align-items:center; gap:8px;
+  padding:7px 12px; border-bottom:1px solid rgba(255,255,255,0.03);
+  font-family:'Share Tech Mono',monospace; font-size:9px;
+  color:var(--dim); cursor:pointer; transition:background 0.1s, color 0.1s;
+}
+.file-item:hover { background:rgba(255,255,255,0.04); color:#fff; }
+.file-icon { opacity:0.45; font-size:10px; }
+.files-empty { padding:10px 12px; font-family:'Share Tech Mono',monospace; font-size:9px; color:rgba(255,255,255,0.12); }
+
+/* ── Log ── */
+.log-panel {
+  background:rgba(0,0,0,0.45); border:1px solid var(--border);
+  height:150px; overflow-y:auto; padding:8px 12px;
+  display:flex; flex-direction:column; gap:3px;
+  font-family:'Share Tech Mono',monospace; font-size:9px;
+  scroll-behavior:smooth;
+}
+.log-panel::-webkit-scrollbar { width:3px; }
+.log-panel::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); }
+.log-entry { line-height:1.5; }
+.log-entry .log-ts  { color:rgba(255,255,255,0.18); margin-right:7px; }
+.log-entry .log-msg { color:rgba(255,255,255,0.55); }
+.log-entry.ok   .log-msg { color:var(--green); }
+.log-entry.warn .log-msg { color:var(--amber); }
+.log-entry.err  .log-msg { color:var(--red2); }
+.log-entry.info .log-msg { color:var(--cyan); }
+
+/* ── Action button in cards ── */
+.card-action-btn {
+  background:transparent; border:1px solid var(--border);
+  color:var(--dim); font-family:'Share Tech Mono',monospace;
+  font-size:8px; letter-spacing:2px; text-transform:uppercase;
+  cursor:pointer; padding:4px 8px; transition:all 0.15s;
+}
+.card-action-btn:hover { color:#fff; border-color:rgba(255,255,255,0.2); }
+
+@media (max-width:900px) { .page { grid-template-columns:1fr; } }
+
+::-webkit-scrollbar { width:3px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:#222; border-radius:2px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div>
+        <div class="header-logo">◈ TeleEmpuxo</div>
+        <div class="header-title">MISSION CONTROL</div>
+        <div class="header-sub">Operação &amp; Missão</div>
+      </div>
+    </div>
+    <div class="ws-pill">
+      <div class="ws-dot" id="wsDot"></div>
+      <span id="wsLabel">conectando...</span>
+    </div>
+  </header>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div class="status-cell">
+      <div class="status-lbl">Sessão</div>
+      <div class="status-val dim" id="sb-state">IDLE</div>
+    </div>
+    <div class="status-cell">
+      <div class="status-lbl">Força Atual</div>
+      <div class="status-val" id="sb-force">0.0 N</div>
+    </div>
+    <div class="status-cell">
+      <div class="status-lbl">Pico</div>
+      <div class="status-val" id="sb-peak">0 N</div>
+    </div>
+    <div class="status-cell">
+      <div class="status-lbl">ESP32</div>
+      <div class="status-val dim" id="sb-esp">--</div>
+    </div>
+    <div class="status-cell">
+      <div class="status-lbl">Taxa</div>
+      <div class="status-val cyan" id="sb-hz">-- Hz</div>
+    </div>
+  </div>
+
+  <!-- ── Main Column ── -->
+  <div class="main-col">
+
+    <!-- Mission Control Card -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">◈ Controle de Missão</span>
+        <span class="card-badge dim" id="missionBadge">IDLE</span>
+      </div>
+      <div class="card-body">
+
+        <div class="tminus-wrap">
+          <div class="tminus-label">Contagem Regressiva</div>
+          <div class="tminus-display" id="tminusDisplay">
+            <span class="t-prefix">T-</span><span id="tminusVal">--</span>
+          </div>
+          <div class="hold-reason" id="holdReasonEl"></div>
+          <div class="tminus-status" id="tminusStatus">aguardando início</div>
+        </div>
+
+        <div class="t-config">
+          <label>Tempo T-</label>
+          <input type="number" class="t-input" id="tInput" value="60" min="5" max="3600">
+          <span class="t-unit">seg</span>
+          <button class="btn-set-t" onclick="setT()">Definir</button>
+        </div>
+
+        <div class="mission-btns" style="margin-top:14px;" id="missionBtns">
+          <button class="mbtn start"   id="btnStart"  onclick="missionStart()">
+            <span class="mbtn-icon">▶</span>
+            <span>Iniciar</span>
+            <span class="mbtn-label">começar T-minus</span>
+          </button>
+          <button class="mbtn hold"    id="btnHold"   onclick="missionHold()">
+            <span class="mbtn-icon">⏸</span>
+            <span>Hold</span>
+            <span class="mbtn-label">pausar contagem</span>
+          </button>
+          <button class="mbtn resume"  id="btnResume" onclick="missionResume()" style="display:none">
+            <span class="mbtn-icon">▶</span>
+            <span>Resume</span>
+            <span class="mbtn-label">retomar contagem</span>
+          </button>
+          <button class="mbtn scrub"   id="btnScrub"  onclick="scrubRequest()">
+            <span class="mbtn-icon">✕</span>
+            <span>Scrub</span>
+            <span class="mbtn-label">cancelar teste</span>
+          </button>
+          <button class="mbtn reset-m" id="btnReset"  onclick="missionReset()" style="display:none">
+            <span class="mbtn-icon">↺</span>
+            <span>Reset</span>
+            <span class="mbtn-label">nova missão</span>
+          </button>
+        </div>
+
+        <!-- Mission blocked banner -->
+        <div class="mission-blocked-banner" id="missionBlockedBanner">
+          <span class="mbb-icon">⛔</span>
+          <span class="mbb-text" id="missionBlockedMsg">Início bloqueado — verifique GO/NO-GO</span>
+          <button class="mbb-close" onclick="hideMissionBlocked()">✕</button>
+        </div>
+
+        <!-- Scrub confirmation -->
+        <div class="scrub-confirm" id="scrubConfirm">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--red2);text-transform:uppercase;">
+            ⚠ Confirmar Scrub — Esta ação encerrará o teste
+          </div>
+          <input type="text" id="scrubReasonInput" placeholder="Motivo do scrub (opcional)...">
+          <div class="scrub-confirm-btns">
+            <button class="scrub-yes" onclick="missionScrubConfirm()">Confirmar Scrub</button>
+            <button class="scrub-no"  onclick="scrubCancel()">Cancelar</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- GO/NO-GO Checklist -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">◈ Checklist GO / NO-GO</span>
+        <span class="card-badge dim" id="goNogoBadge">AGUARDANDO</span>
+      </div>
+      <div class="card-body">
+        <div class="gonogo-grid" id="gonogoGrid"></div>
+        <div class="gonogo-summary" style="margin-top:10px;">
+          <span class="gonogo-summary-lbl">Status Geral</span>
+          <span class="gonogo-summary-val not-go" id="gonogoSummary">NO-GO</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">◈ Log de Missão</span>
+        <button class="card-action-btn" onclick="clearLog()">limpar</button>
+      </div>
+      <div class="card-body" style="padding:12px 14px;">
+        <div class="log-panel" id="logPanel"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Side Column ── -->
+  <div class="side-col">
+
+    <!-- Controles de Sessão -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">◈ Sessão de Telemetria</span>
+      </div>
+      <div class="card-body">
+
+        <!-- GO/NO-GO lock warning -->
+        <div class="session-lock" id="sessionLock">
+          <span style="color:var(--red2);font-size:12px;">⚠</span>
+          <span class="session-lock-txt">Aguardando ALL GO para iniciar</span>
+        </div>
+
+        <div class="mission-btns three" style="margin-bottom:8px;">
+          <button class="mbtn start"   id="qStart" onclick="sendCmd('start')">
+            <span class="mbtn-icon">▶</span>
+            <span style="font-size:8px">Start</span>
+          </button>
+          <button class="mbtn scrub"   id="qStop"  onclick="sendCmd('stop')">
+            <span class="mbtn-icon">■</span>
+            <span style="font-size:8px">Stop</span>
+          </button>
+          <button class="mbtn reset-m" id="qReset" onclick="sendCmd('reset')">
+            <span class="mbtn-icon">↺</span>
+            <span style="font-size:8px">Reset</span>
+          </button>
+        </div>
+        <button class="mbtn start" style="width:100%" onclick="sendCmd('tare')">
+          <span class="mbtn-icon">⊙</span>
+          <span style="font-size:8px">Tara / Zero</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Overlay Controls -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">◈ Overlay — Visibilidade</span>
+      </div>
+      <div class="card-body">
+        <div class="ovl-global-btns">
+          <button class="ovl-global-btn show" onclick="setGlobalOverlay(true)">◈ Exibir Tudo</button>
+          <button class="ovl-global-btn hide" onclick="setGlobalOverlay(false)">✕ Ocultar Tudo</button>
+        </div>
+        <div class="ovl-grid" id="ovlGrid"></div>
+      </div>
+    </div>
+
+    <!-- Arquivos de Sessão -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">◈ Arquivos de Sessão</span>
+        <button class="card-action-btn" onclick="refreshFiles()">↺ atualizar</button>
+      </div>
+      <div class="card-body" style="padding:8px 0;">
+        <div class="files-list" id="filesArea">
+          <div class="files-empty" id="files-placeholder">Nenhum arquivo ainda</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ════ CONFIG ════
+const params  = new URLSearchParams(location.search);
+const WS_IP   = params.get('ip')   || location.hostname || 'localhost';
+const WS_PORT = params.get('port') || '8766';
+const WS_URL  = `ws://${WS_IP}:${WS_PORT}`;
+
+// ════ STATE ════
+const MISSION = { IDLE:'mission_idle', COUNTING:'mission_counting', HOLD:'mission_hold', SCRUBBED:'mission_scrubbed' };
+const SESSION = { IDLE:'idle', RUNNING:'running', COMPLETE:'complete' };
+
+let missionState   = MISSION.IDLE;
+let sessionState   = SESSION.IDLE;
+let missionSeconds = 0;
+let gonogo         = [];
+let allGo          = false;
+let hzCount = 0, lastHz = Date.now();
+let ovlState = { left:true, center:true, right:true, info:true, graph:true };
+let ovlGlobal = true;
+
+const OVL_SECTIONS = [
+  { id:'left',   name:'Pico (Esquerdo)' },
+  { id:'center', name:'Força / Centro'  },
+  { id:'right',  name:'Tempo (Direito)' },
+  { id:'info',   name:'Barra de Info'   },
+  { id:'graph',  name:'Mini Gráfico'    },
+];
+
+// ════ BUILD UI ════
+function buildOverlayGrid() {
+  const grid = document.getElementById('ovlGrid');
+  grid.innerHTML = '';
+  OVL_SECTIONS.forEach(sec => {
+    const row = document.createElement('div');
+    row.className = 'ovl-row'; row.id = `ovlrow-${sec.id}`;
+    row.innerHTML = `
+      <span class="ovl-name">${sec.name}</span>
+      <div class="ovl-btns">
+        <button class="ovl-btn show-btn active" id="ovl-show-${sec.id}" onclick="setOverlay('${sec.id}',true)">VIS</button>
+        <button class="ovl-btn hide-btn"        id="ovl-hide-${sec.id}" onclick="setOverlay('${sec.id}',false)">OCU</button>
+      </div>`;
+    grid.appendChild(row);
+  });
+}
+
+function buildGonogoGrid() {
+  const grid = document.getElementById('gonogoGrid');
+  grid.innerHTML = '';
+  gonogo.forEach(item => {
+    const div = document.createElement('div');
+    div.className = `gonogo-item ${item.go ? 'go' : 'nogo'}`;
+    div.id = `gonogo-${item.id}`;
+    const autoTag  = item.auto ? '<span class="auto-tag">auto</span>' : '';
+    const disabled = item.auto ? 'disabled' : '';
+    div.innerHTML = `
+      <span class="gonogo-label">${item.label}${autoTag}</span>
+      <div class="gonogo-toggle">
+        <button class="gonogo-btn go-btn ${item.go ? 'active':''}" ${disabled} onclick="setGoNogo('${item.id}',true)">GO</button>
+        <button class="gonogo-btn nogo-btn ${!item.go?'active':''}" ${disabled} onclick="setGoNogo('${item.id}',false)">NO-GO</button>
+      </div>`;
+    grid.appendChild(div);
+  });
+  updateGonogoSummary();
+}
+
+// ════ MISSION CONTROL ════
+function missionStart() {
+  const t = parseInt(document.getElementById('tInput').value) || 60;
+  sendCmd('mission_start', { t_seconds: t });
+}
+function missionHold() {
+  const reason = prompt('Motivo do Hold (opcional):') || 'Hold solicitado pelo operador';
+  sendCmd('mission_hold', { reason });
+}
+function missionResume() { sendCmd('mission_resume'); }
+function missionReset()  { sendCmd('mission_reset');  }
+
+function scrubRequest() {
+  document.getElementById('scrubConfirm').classList.add('show');
+  document.getElementById('btnScrub').classList.add('confirm-mode');
+}
+function scrubCancel() {
+  document.getElementById('scrubConfirm').classList.remove('show');
+  document.getElementById('btnScrub').classList.remove('confirm-mode');
+}
+function missionScrubConfirm() {
+  const reason = document.getElementById('scrubReasonInput').value || 'Scrub solicitado pelo operador';
+  sendCmd('mission_scrub', { reason });
+  scrubCancel();
+}
+function setT() {
+  const t = parseInt(document.getElementById('tInput').value);
+  if (isNaN(t) || t < 5 || t > 3600) { addLog('Tempo inválido (5–3600s)', 'err'); return; }
+  sendCmd('mission_set_t', { t_seconds: t });
+}
+
+// ════ GO/NO-GO ════
+function setGoNogo(id, go) { sendCmd('gonogo_set', { id, go }); }
+
+function updateGonogoSummary() {
+  allGo = gonogo.length > 0 && gonogo.every(i => i.go);
+  const el    = document.getElementById('gonogoSummary');
+  const badge = document.getElementById('goNogoBadge');
+  if (el) { el.textContent = allGo ? 'ALL GO ✓' : 'NO-GO'; el.className = `gonogo-summary-val ${allGo ? 'all-go' : 'not-go'}`; }
+  if (badge) { badge.textContent = allGo ? 'ALL GO' : 'NO-GO'; badge.className = `card-badge ${allGo ? 'green' : 'red'}`; }
+
+  // Show/hide session lock warning
+  const lock = document.getElementById('sessionLock');
+  if (lock) lock.classList.toggle('show', !allGo);
+
+  // Disable quick Start when not all go
+  const qStart = document.getElementById('qStart');
+  if (qStart) qStart.disabled = !allGo;
+}
+
+// ════ MISSION BLOCKED ════
+function showMissionBlocked(reason) {
+  const banner = document.getElementById('missionBlockedBanner');
+  const msg    = document.getElementById('missionBlockedMsg');
+  if (msg)    msg.textContent = reason || 'Início bloqueado — verifique GO/NO-GO';
+  if (banner) banner.classList.add('show');
+}
+function hideMissionBlocked() {
+  document.getElementById('missionBlockedBanner')?.classList.remove('show');
+}
+
+// ════ OVERLAY ════
+function setOverlay(target, show) {
+  ovlState[target] = show;
+  document.getElementById(`ovl-show-${target}`)?.classList.toggle('active', show);
+  document.getElementById(`ovl-hide-${target}`)?.classList.toggle('active', !show);
+  send({ action:'overlay_ctrl', target, show });
+  addLog(`Overlay [${target}]: ${show ? 'visível' : 'oculto'}`, 'info');
+}
+function setGlobalOverlay(show) {
+  ovlGlobal = show;
+  send({ action:'overlay_visibility', show });
+  addLog(`Overlay global: ${show ? 'exibido' : 'ocultado'}`, show ? 'ok' : 'warn');
+}
+
+// ════ T-MINUS ════
+function formatT(s) {
+  if (s === null || s === undefined || isNaN(s)) return '--';
+  const m   = Math.floor(s / 60);
+  const sec = String(s % 60).padStart(2, '0');
+  return m > 0 ? `${m}:${sec}` : String(s).padStart(2, '0');
+}
+
+function updateTminusDisplay() {
+  const disp   = document.getElementById('tminusDisplay');
+  const val    = document.getElementById('tminusVal');
+  const status = document.getElementById('tminusStatus');
+  const hold   = document.getElementById('holdReasonEl');
+  const badge  = document.getElementById('missionBadge');
+
+  disp.classList.remove('counting','hold','urgent','scrubbed');
+
+  switch(missionState) {
+    case MISSION.COUNTING:
+      val.textContent = formatT(missionSeconds);
+      disp.classList.add(missionSeconds <= 10 ? 'urgent' : 'counting');
+      status.textContent = 'contagem ativa';
+      hold.classList.remove('show');
+      badge.textContent = 'CONTANDO'; badge.className = 'card-badge amber';
+      break;
+    case MISSION.HOLD:
+      val.textContent = formatT(missionSeconds);
+      disp.classList.add('hold');
+      status.textContent = 'contagem pausada';
+      hold.classList.add('show');
+      badge.textContent = 'HOLD'; badge.className = 'card-badge amber';
+      break;
+    case MISSION.SCRUBBED:
+      val.textContent = 'SCRUB';
+      disp.classList.add('scrubbed');
+      status.textContent = 'teste cancelado';
+      hold.classList.remove('show');
+      badge.textContent = 'SCRUBBED'; badge.className = 'card-badge red';
+      break;
+    default:
+      val.textContent = formatT(parseInt(document.getElementById('tInput').value) || 60);
+      status.textContent = 'aguardando início';
+      hold.classList.remove('show');
+      badge.textContent = 'IDLE'; badge.className = 'card-badge dim';
+  }
+}
+
+function syncMissionButtons() {
+  const isIdle     = missionState === MISSION.IDLE;
+  const isCounting = missionState === MISSION.COUNTING;
+  const isHold     = missionState === MISSION.HOLD;
+  const isScrubbed = missionState === MISSION.SCRUBBED;
+
+  const show = (id, v) => { const el = document.getElementById(id); if (el) el.style.display = v ? '' : 'none'; };
+
+  show('btnStart',  isIdle || isScrubbed);
+  show('btnHold',   isCounting);
+  show('btnResume', isHold);
+  show('btnScrub',  isCounting || isHold);
+  show('btnReset',  isScrubbed);
+}
+
+// ════ FILES ════
+function refreshFiles() {
+  send({ action: 'get_logs' });
+  send({ action: 'get_plots' });
+}
+
+function updateFiles(files, ext) {
+  const area = document.getElementById('filesArea');
+  const ph   = document.getElementById('files-placeholder');
+  files.forEach(fname => {
+    if (area.querySelector(`[data-name="${CSS.escape(fname)}"]`)) return;
+    if (ph) ph.remove();
+    const icon = ext === 'csv' ? '📄' : '📊';
+    const url  = ext === 'csv' ? `/logs/${fname}` : `/plots/${fname}`;
+    const el   = document.createElement('div');
+    el.className    = 'file-item';
+    el.dataset.name = fname;
+    el.innerHTML    = `<span class="file-icon">${icon}</span>${fname}`;
+    el.onclick      = () => window.open(`http://${WS_IP}:8080${url}`, '_blank');
+    area.insertBefore(el, area.firstChild);
+  });
+}
+
+// ════ MESSAGE HANDLER ════
+function handleMsg(msg) {
+  const t = msg.type;
+
+  if (['mission_start','mission_tick','mission_hold','mission_resume',
+       'mission_scrub','mission_reset','mission_t0','mission_config'].includes(t)) {
+    applyMissionState(msg);
+    if (t === 'mission_start')  addLog('Contagem iniciada — T-' + (msg.mission_t || msg.t_seconds) + 's', 'ok');
+    if (t === 'mission_hold')   addLog('⏸ HOLD — ' + (msg.hold_reason || ''), 'warn');
+    if (t === 'mission_resume') addLog('▶ Contagem retomada.', 'ok');
+    if (t === 'mission_scrub')  addLog('✕ SCRUB — ' + (msg.scrub_reason || ''), 'err');
+    if (t === 'mission_reset')  addLog('Missão resetada.', 'info');
+    if (t === 'mission_t0')     addLog('T-0 atingido! Aguardando empuxo…', 'ok');
+    return;
+  }
+
+  if (t === 'mission_blocked') {
+    showMissionBlocked(msg.reason);
+    addLog(`⛔ ${msg.reason || 'Início bloqueado'}`, 'err');
+    return;
+  }
+
+  if (t === 'gonogo_update') {
+    if (msg.gonogo) { gonogo = msg.gonogo; buildGonogoGrid(); }
+    return;
+  }
+
+  if (t === 'state_update') {
+    applyServerState(msg);
+    if (msg.gonogo) { gonogo = msg.gonogo; buildGonogoGrid(); }
+    if (msg.mission_state) applyMissionState(msg);
+    if (msg.event === 'session_end') {
+      addLog(`✓ Sessão encerrada — Pico: ${msg.peak}N · Impulso: ${msg.impulse}N·s`, 'ok');
+      refreshFiles();
+    }
+    return;
+  }
+
+  if (t === 'data') {
+    const force = parseFloat(msg.f ?? 0);
+    const peak  = parseFloat(msg.peak ?? 0);
+    document.getElementById('sb-force').textContent = force.toFixed(1) + ' N';
+    document.getElementById('sb-peak').textContent  = peak.toFixed(0) + ' N';
+    hzCount++;
+    const now = Date.now();
+    if (now - lastHz >= 1000) {
+      document.getElementById('sb-hz').textContent = hzCount + ' Hz';
+      hzCount = 0; lastHz = now;
+    }
+    return;
+  }
+
+  if (t === 'tare_ack') {
+    const reached = msg.esp_reached !== false;
+    addLog(reached ? 'Tara enviada ao ESP32.' : 'Tara: ESP32 não conectado.', reached ? 'info' : 'warn');
+    return;
+  }
+
+  if (t === 'log_list')  { updateFiles(msg.logs  || [], 'csv'); return; }
+  if (t === 'plot_list') { updateFiles(msg.plots || [], 'png'); return; }
+}
+
+function applyMissionState(msg) {
+  if (msg.mission_state)   missionState   = msg.mission_state;
+  if (msg.mission_seconds !== undefined) missionSeconds = msg.mission_seconds;
+  if (msg.hold_reason !== undefined) {
+    document.getElementById('holdReasonEl').textContent = msg.hold_reason || '';
+  }
+  if (msg.t_seconds || msg.mission_t) {
+    document.getElementById('tInput').value = msg.mission_t || msg.t_seconds;
+  }
+  updateTminusDisplay();
+  syncMissionButtons();
+}
+
+function applyServerState(msg) {
+  if (msg.state) {
+    sessionState = msg.state;
+    const el  = document.getElementById('sb-state');
+    const map = { idle:'IDLE', running:'RUNNING', complete:'COMPLETO' };
+    const cls = { idle:'dim',  running:'cyan',    complete:'green' };
+    el.textContent = map[sessionState] || sessionState.toUpperCase();
+    el.className   = `status-val ${cls[sessionState] || ''}`;
+  }
+  if (msg.esp !== undefined) {
+    const ok = !!msg.esp;
+    const el = document.getElementById('sb-esp');
+    el.textContent = ok ? 'OK' : 'ERR';
+    el.className   = `status-val ${ok ? 'green' : 'red'}`;
+  }
+}
+
+// ════ LOG ════
+function addLog(msg, type='') {
+  const panel = document.getElementById('logPanel');
+  const now   = new Date();
+  const ts    = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  entry.innerHTML = `<span class="log-ts">${ts}</span><span class="log-msg">${msg}</span>`;
+  panel.appendChild(entry);
+  panel.scrollTop = panel.scrollHeight;
+  if (panel.children.length > 200) panel.removeChild(panel.firstChild);
+}
+function clearLog() { document.getElementById('logPanel').innerHTML = ''; }
+
+// ════ WEBSOCKET ════
+let ws = null, reconnTimer = null;
+function send(obj) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); }
+function sendCmd(action, extra={}) { send({ action, ...extra }); }
+
+function connect() {
+  if (ws && ws.readyState <= 1) return;
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => {
+    document.getElementById('wsDot').className = 'ws-dot ok';
+    document.getElementById('wsLabel').textContent = `${WS_IP}:${WS_PORT}`;
+    if (reconnTimer) { clearTimeout(reconnTimer); reconnTimer = null; }
+    addLog(`Conectado a ${WS_IP}:${WS_PORT}`, 'ok');
+    refreshFiles();
+  };
+  ws.onmessage = e => { try { handleMsg(JSON.parse(e.data)); } catch {} };
+  ws.onclose = () => {
+    document.getElementById('wsDot').className = 'ws-dot err';
+    document.getElementById('wsLabel').textContent = 'sem conexão';
+    if (!reconnTimer) reconnTimer = setTimeout(connect, 2500);
+  };
+  ws.onerror = () => { document.getElementById('wsDot').className = 'ws-dot err'; };
+}
+
+// ════ INIT ════
+buildOverlayGrid();
+buildGonogoGrid();
+updateTminusDisplay();
+syncMissionButtons();
+connect();
+addLog('Mission Control carregado.', 'info');
+</script>
+</body>
+</html>

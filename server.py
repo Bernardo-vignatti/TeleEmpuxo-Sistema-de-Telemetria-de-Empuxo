@@ -273,7 +273,13 @@ def generate_plot(session_name: str, samples: List[Tuple[float, float]]) -> str:
     times  = times - times[0]
 
     peak     = float(np.max(forces))
-    impulse  = float(np.trapz(forces, times))
+    
+    # ✅ CORREÇÃO DE INCOMPATIBILIDADE (NumPy 1.x vs NumPy 2.0+)
+    if hasattr(np, 'trapezoid'):
+        impulse = float(np.trapezoid(forces, times))
+    else:
+        impulse = float(np.trapz(forces, times))
+
     above    = forces > BURN_THRESHOLD
     avg_f    = float(np.mean(forces[above])) if np.any(above) else 0.0
     burn_dur = float(times[above][-1] - times[above][0]) if np.any(above) else 0.0
@@ -283,7 +289,7 @@ def generate_plot(session_name: str, samples: List[Tuple[float, float]]) -> str:
     fig.patch.set_facecolor('#0d0d0f')
 
     ax = axes[0]
-    ax.set_facecolor('#111114')  # ✅ cor válida (era '#11114' — 5 chars inválido)
+    ax.set_facecolor('#111114')  
     ax.fill_between(times, forces, alpha=0.25, color='#e53935')
     ax.fill_between(times, forces, where=above, alpha=0.35, color='#ff6b35')
     ax.plot(times, forces, color='#ff4444', linewidth=2.2, solid_capstyle='round')
@@ -300,7 +306,7 @@ def generate_plot(session_name: str, samples: List[Tuple[float, float]]) -> str:
     )
     ax.text(0.98, 0.97, info, transform=ax.transAxes, fontsize=10,
             verticalalignment='top', horizontalalignment='right',
-            color='#cccccc',  # ✅ cor válida (era '#cccc' — 4 chars inválido)
+            color='#cccccc',  
             fontfamily='monospace',
             bbox=dict(boxstyle='round,pad=0.5', facecolor='#1a1a1f',
                     edgecolor='#333333', alpha=0.9))
@@ -319,7 +325,7 @@ def generate_plot(session_name: str, samples: List[Tuple[float, float]]) -> str:
     ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
 
     ax2 = axes[1]
-    ax2.set_facecolor('#111114')  # ✅ cor válida
+    ax2.set_facecolor('#111114')  
     if len(forces) > 2:
         dt = np.diff(times)
         dt[dt == 0] = 1e-6
@@ -744,16 +750,19 @@ async def handle_command(cmd: Dict):
 
     elif action == "plot":
         if session.samples:
-            loop = asyncio.get_running_loop()  # ✅ correto para Python 3.10+
-            path = await loop.run_in_executor(
-                None, generate_plot, session.session_name, list(session.samples)
-            )
-            if path:
-                await broadcast({
-                    "type": "plot_ready",
-                    "path": path,
-                    "name": Path(path).name,
-                })
+            loop = asyncio.get_running_loop()  
+            try:
+                path = await loop.run_in_executor(
+                    None, generate_plot, session.session_name, list(session.samples)
+                )
+                if path:
+                    await broadcast({
+                        "type": "plot_ready",
+                        "path": path,
+                        "name": Path(path).name,
+                    })
+            except Exception as e:
+                log.error(f"[PLOT] Erro ao processar comando manual de plot: {e}")
         else:
             log.warning("[PLOT] Sem amostras.")
 

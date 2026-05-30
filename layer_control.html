@@ -270,6 +270,64 @@ body::after {
 }
 .scrub-no:hover { color:#fff; border-color:rgba(255,255,255,0.2); }
 
+/* ── Hold confirm (same pattern as scrub-confirm) ── */
+.hold-confirm {
+  display:none; flex-direction:column; gap:8px;
+  padding:14px; background:rgba(255,171,0,0.06);
+  border:1px solid rgba(255,171,0,0.2); margin-top:8px;
+}
+.hold-confirm.show { display:flex; }
+.hold-confirm input {
+  background:rgba(0,0,0,0.5); border:1px solid rgba(255,171,0,0.25);
+  color:#fff; font-family:'Share Tech Mono',monospace; font-size:10px;
+  padding:7px 10px; outline:none; width:100%;
+}
+.hold-confirm input::placeholder { color:rgba(255,255,255,0.18); }
+.hold-confirm-btns { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.hold-yes {
+  background:var(--amber); border:none; color:#000;
+  font-family:'Orbitron',monospace; font-size:9px; letter-spacing:3px;
+  padding:9px; cursor:pointer; font-weight:700; text-transform:uppercase;
+  transition:opacity 0.2s;
+}
+.hold-yes:hover { opacity:0.85; }
+.hold-no {
+  background:transparent; border:1px solid var(--border); color:var(--dim);
+  font-family:'Orbitron',monospace; font-size:9px; letter-spacing:3px;
+  padding:9px; cursor:pointer; text-transform:uppercase; transition:all 0.2s;
+}
+.hold-no:hover { color:#fff; border-color:rgba(255,255,255,0.2); }
+
+/* ── T-0 launch confirm ── */
+.t0-confirm {
+  display:none; flex-direction:column; gap:8px;
+  padding:14px; background:rgba(0,230,118,0.05);
+  border:1px solid rgba(0,230,118,0.25); margin-top:8px;
+}
+.t0-confirm.show { display:flex; }
+.t0-confirm-title {
+  font-family:'Share Tech Mono',monospace; font-size:9px;
+  letter-spacing:2px; color:var(--green); text-transform:uppercase;
+  animation:t0Pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes t0Pulse {
+  from { opacity:0.7; } to { opacity:1; text-shadow:0 0 12px rgba(0,230,118,0.5); }
+}
+.t0-confirm-btns { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.t0-launch {
+  background:var(--green); border:none; color:#000;
+  font-family:'Orbitron',monospace; font-size:9px; letter-spacing:3px;
+  padding:9px; cursor:pointer; font-weight:700; text-transform:uppercase;
+  transition:opacity 0.2s;
+}
+.t0-launch:hover { opacity:0.85; }
+.t0-scrub {
+  background:transparent; border:1px solid rgba(229,57,53,0.4); color:var(--red2);
+  font-family:'Orbitron',monospace; font-size:9px; letter-spacing:3px;
+  padding:9px; cursor:pointer; text-transform:uppercase; transition:all 0.2s;
+}
+.t0-scrub:hover { background:rgba(229,57,53,0.08); }
+
 /* ── Mission blocked banner ── */
 .mission-blocked-banner {
   display:none;
@@ -536,6 +594,27 @@ body::after {
           </div>
         </div>
 
+        <!-- Hold confirmation -->
+        <div class="hold-confirm" id="holdConfirm">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--amber);text-transform:uppercase;">
+            ⏸ Confirmar Hold — Pausar contagem regressiva
+          </div>
+          <input type="text" id="holdReasonInput" placeholder="Motivo do hold (opcional)...">
+          <div class="hold-confirm-btns">
+            <button class="hold-yes" onclick="missionHoldConfirm()">Confirmar Hold</button>
+            <button class="hold-no"  onclick="holdCancel()">Cancelar</button>
+          </div>
+        </div>
+
+        <!-- T-0 launch confirmation -->
+        <div class="t0-confirm" id="t0Confirm">
+          <div class="t0-confirm-title">⬥ T-0 Atingido — Confirmar Ação</div>
+          <div class="t0-confirm-btns">
+            <button class="t0-launch" onclick="t0Launch()">▶ Iniciar</button>
+            <button class="t0-scrub"  onclick="t0Scrub()">✕ Scrub</button>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -706,15 +785,32 @@ function missionStart() {
   sendCmd('mission_start', { t_seconds: t });
 }
 function missionHold() {
-  const reason = prompt('Motivo do Hold (opcional):') || 'Hold solicitado pelo operador';
-  sendCmd('mission_hold', { reason });
+  // Show inline hold confirm panel (same pattern as scrub)
+  closeAllConfirms();
+  document.getElementById('holdConfirm').classList.add('show');
+  document.getElementById('btnHold').classList.add('pulsing');
+  document.getElementById('holdReasonInput').value = '';
+  document.getElementById('holdReasonInput').focus();
 }
+function holdCancel() {
+  document.getElementById('holdConfirm').classList.remove('show');
+  document.getElementById('btnHold').classList.remove('pulsing');
+}
+function missionHoldConfirm() {
+  const reason = document.getElementById('holdReasonInput').value || 'Hold solicitado pelo operador';
+  sendCmd('mission_hold', { reason });
+  holdCancel();
+}
+
 function missionResume() { sendCmd('mission_resume'); }
 function missionReset()  { sendCmd('mission_reset');  }
 
 function scrubRequest() {
+  closeAllConfirms();
   document.getElementById('scrubConfirm').classList.add('show');
   document.getElementById('btnScrub').classList.add('confirm-mode');
+  document.getElementById('scrubReasonInput').value = '';
+  document.getElementById('scrubReasonInput').focus();
 }
 function scrubCancel() {
   document.getElementById('scrubConfirm').classList.remove('show');
@@ -724,6 +820,33 @@ function missionScrubConfirm() {
   const reason = document.getElementById('scrubReasonInput').value || 'Scrub solicitado pelo operador';
   sendCmd('mission_scrub', { reason });
   scrubCancel();
+}
+
+// ════ T-0 CONFIRM ════
+function showT0Confirm() {
+  closeAllConfirms();
+  document.getElementById('t0Confirm').classList.add('show');
+  addLog('⬥ T-0 atingido — aguardando confirmação do operador', 'warn');
+}
+function hideT0Confirm() {
+  document.getElementById('t0Confirm').classList.remove('show');
+}
+function t0Launch() {
+  hideT0Confirm();
+  sendCmd('start');
+  addLog('▶ Iniciar enviado pelo operador.', 'ok');
+}
+function t0Scrub() {
+  hideT0Confirm();
+  sendCmd('mission_scrub', { reason: 'Operador abortou no T-0' });
+  addLog('✕ Scrub no T-0 — operador abortou.', 'err');
+}
+
+// Fecha todos os painéis de confirmação abertos
+function closeAllConfirms() {
+  holdCancel();
+  scrubCancel();
+  hideT0Confirm();
 }
 function setT() {
   const t = parseInt(document.getElementById('tInput').value);
@@ -869,10 +992,10 @@ function handleMsg(msg) {
     applyMissionState(msg);
     if (t === 'mission_start')  addLog('Contagem iniciada — T-' + (msg.mission_t || msg.t_seconds) + 's', 'ok');
     if (t === 'mission_hold')   addLog('⏸ HOLD — ' + (msg.hold_reason || ''), 'warn');
-    if (t === 'mission_resume') addLog('▶ Contagem retomada.', 'ok');
-    if (t === 'mission_scrub')  addLog('✕ SCRUB — ' + (msg.scrub_reason || ''), 'err');
-    if (t === 'mission_reset')  addLog('Missão resetada.', 'info');
-    if (t === 'mission_t0')     addLog('T-0 atingido! Aguardando empuxo…', 'ok');
+    if (t === 'mission_resume') { closeAllConfirms(); addLog('▶ Contagem retomada.', 'ok'); }
+    if (t === 'mission_scrub')  { closeAllConfirms(); addLog('✕ SCRUB — ' + (msg.scrub_reason || ''), 'err'); }
+    if (t === 'mission_reset')  { closeAllConfirms(); addLog('Missão resetada.', 'info'); }
+    if (t === 'mission_t0')     { closeAllConfirms(); showT0Confirm(); }
     return;
   }
 
